@@ -20,6 +20,16 @@ let TODOS = [
         "due": "2023-01-14T00:00:00.000Z",
         "status": 2
     },
+    {
+        "_id": 1671087245764,
+        "title": "Einen Kuchen backen",
+        "due": "2023-01-14T00:00:00.000Z",
+        "status": 1
+    }
 ];
 
 // Your code here
+app.get('/todos', (req, res) => {
+    res.json(TODOS);
+});
+app.listen(3000);
