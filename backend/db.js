@@ -31,7 +31,11 @@ export default class DB {
         // TODO: Implement delete
     }
 
-    insert(order) {
-        // TODO: Implement insert
+    insert(todo) {
+        return collection.insertOne(todo)
+        .then(result => {
+            todo._id = result.insertedId;
+            return todo;
+        })
     }
 }

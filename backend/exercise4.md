@@ -11,7 +11,7 @@ npm install express-validator
 2. Importieren Sie `express-validator` in der Datei, in der Sie Ihre Routen definieren (z.B. `todos.js`):
 
 ```javascript
-const { check, validationResult } = require('express-validator');
+import { check, validationResult } from 'express-validator';
 ```
 
 3. Fügen Sie Validierungsregeln für die gewünschten Routen hinzu. Zum Beispiel, um die Titel bei der Erstellung eines neuen Todos zu validieren, fügen Sie die folgenden Regeln hinzu:
