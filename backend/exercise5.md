@@ -68,7 +68,7 @@ Hier ist ein Beispiel für die `/todos` GET-Route:
  *              items:
  *                $ref: '#/components/schemas/Todo'
  */
-router.get('/todos', async (req, res) => {
+app.get('/todos', async (req, res) => {
   // Ihre Logik zum Abrufen der Todos
 });
 ```
