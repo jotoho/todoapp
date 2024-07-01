@@ -4,15 +4,22 @@
   "description": "Backend für ToDo-Anwendung",
   "main": "index.js",
   "scripts": {
-    "start": "node --watch index.js",
+    "start": "tsx watch index.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "type": "module",
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.14.9",
+    "ts-node": "^10.9.2",
+    "tsx": "^4.16.0",
+    "typescript": "^5.5.2"
   },
   "dependencies": {
-    "express": "^4.19.2"
+    "express": "^4.19.2",
+    "express-validator": "^7.1.0",
+    "mongodb": "^6.8.0"
   }
 }
