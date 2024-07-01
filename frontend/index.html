@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<!--
+  SPDX-FileCopyrightText: 2024 Jonas Tobias Hopusch <git@jotoho.de>
+  SPDX-License-Identifier: AGPL-3.0-only
+-->
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="color-scheme" content="dark" />
+    <title>todo Webanwendung von Jonas Hopusch</title>
+    <link rel="stylesheet" type="text/css" href="todo.css" />
+    <script src="todo.js" defer></script>
+  </head>
+  <body>
+    <table id="tasklist">
+      <thead>
+        <th>ID</th>
+        <th>Titel</th>
+        <th>Fällig</th>
+        <th>Erledigt?</th>
+        <th class="tododescription">Beschreibung</th>
+        <th></th>
+        <th></th>
+      </thead>
+      <tbody></tbody>
+    </table>
+
+    <label for="newtodoform"><h2>Aufgabe hinzufügen / bearbeiten:</h2></label>
+    <form id="newtodoform" name="newtodo">
+      <table>
+        <tr>
+          <th><label>ID</label></th>
+          <td>
+            <input
+              id="newtodo-id"
+              type="number"
+              placeholder="Neue Aufgabe"
+              name="id"
+              readonly
+            />
+          </td>
+        </tr>
+
+        <tr>
+          <th class="form-title"><label for="newtodo-title">Titel</label></th>
+          <td class="form-title">
+            <input
+              id="newtodo-title"
+              name="title"
+              type="text"
+              maxlength="100"
+              placeholder="Titel"
+              required
+            />
+          </td>
+        </tr>
+        <tr>
+          <th><label>Beschreibung</label></th>
+          <td>
+            <textarea
+              id="newtodo-description"
+              name="description"
+              placeholder="Aufgabenbeschreibung"
+              maxlength="5000"
+              rows="5"
+            ></textarea>
+          </td>
+        </tr>
+        <tr>
+          <th><label>Fälligkeit</label></th>
+          <td>
+            <input type="datetime-local" name="due" id="newtodo-duetime" />
+          </td>
+        </tr>
+        <tr>
+          <th><label for="newtodo-isdone">Aufgabe erledigt?</label></th>
+          <td>
+            <input id="newtodo-isdone" type="checkbox" name="done" />
+          </td>
+        </tr>
+      </table>
+      <input id="submit-todo" type="submit" />
+      <input id="reset-todoform" type="reset" hidden />
+    </form>
+  </body>
+</html>
