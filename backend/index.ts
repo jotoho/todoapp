@@ -288,10 +288,6 @@ app.put("/todos/:id", ...todoValidationChange, async (req, res) => {
     return;
   }
   const id = BigInt(req.params?.id);
-  if (id !== req.body._id) {
-    console.error("ID mismatch", id, req.body._id);
-    res.status(400).send("ID mismatch between URI and JSON");
-  }
 
   database
     .update(id, await normalizeTodo(req.body))

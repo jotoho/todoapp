@@ -5,6 +5,5 @@ Content-Type: application/json; charset=utf-8
   "title": "Hello World",
   "description": "",
   "duetime": null,
-  "isDone": true,
-  "_id": "31727131048435512041418897379n"
+  "isDone": true
 }

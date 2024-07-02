@@ -103,13 +103,13 @@ export default class DB {
   }
 
   update(id: BigInt, replacement: Todo): Promise<Todo | null> {
-    let replacementInt: any = { ...replacement };
+    let replacementInt: any = convertToDB(replacement);
     delete replacementInt._id;
     return (
       this.collection
         ?.findOneAndUpdate?.(
           { _id: bigIntToObjectId(id) },
-          { "$set": convertToDB(replacementInt) },
+          { $set: replacementInt },
           { upsert: true }
         )
         ?.then?.((result) => (result ? convertFromDB(result) : result)) ??
