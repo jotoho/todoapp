@@ -1,13 +1,88 @@
 import express from "express";
 import { param, body, header, validationResult } from "express-validator";
 import type { ValidationChain } from "express-validator";
+import swaggerUI from "swagger-ui-express";
+import swaggerJSDoc from "swagger-jsdoc";
 
-const CONFIG = Object.freeze({
+type CONFIG_TYPE = {
+  PORT: number;
+  SWAGGER_OPTIONS: Readonly<swaggerJSDoc.Options>;
+};
+
+const CONFIG: CONFIG_TYPE = Object.freeze({
   PORT: 3000,
+  SWAGGER_OPTIONS: Object.freeze({
+    swaggerDefinition: {
+      openapi: "3.1.0",
+      info: {
+        title: "Todo API",
+        version: "1.0.0",
+        description: "Todo API Dokumentation",
+      },
+      servers: [
+        {
+          url: "http://localhost:3000",
+        },
+      ],
+      components: {
+        schemas: {
+          todonew: {
+            type: "object",
+            properties: {
+              title: {
+                type: "string",
+                minLength: 1,
+              },
+              description: {
+                type: "string",
+              },
+              duetime: {
+                type: "integer",
+                format: "int64",
+                minimum: 0,
+              },
+              isDone: {
+                type: "boolean",
+              },
+            },
+            required: ["title"],
+          },
+          todoupdate: {
+            type: "object",
+            properties: {
+              _id: {
+                type: "integer",
+                format: "int64",
+              },
+              title: {
+                type: "string",
+                minLength: 1,
+              },
+              description: {
+                type: "string",
+              },
+              duetime: {
+                type: "integer",
+                format: "int64",
+                minimum: 0,
+              },
+              isDone: {
+                type: "boolean",
+              },
+            },
+            required: ["_id", "title"],
+          },
+        },
+      },
+    },
+    apis: ["./index.ts"],
+  }),
 });
 
 const app = express();
 app.use(express.json());
+const swaggerDocs = swaggerJSDoc(CONFIG.SWAGGER_OPTIONS);
+app.use("/api-docs", swaggerUI.serve, swaggerUI.setup(swaggerDocs));
 
 let TODOS = [
   {
@@ -39,7 +114,9 @@ const todoValidationNew: readonly ValidationChain[] = [
     .isInt()
     .custom((val) => val > 0),
   body("isDone").optional().isBoolean(),
-  header("content-type").matches("application/json"),
+  header("Content-Type").matches(
+    new RegExp("^application/json(; charset=utf-8)?$")
+  ),
 ];
 
 const todoValidationChange: readonly ValidationChain[] = [
@@ -54,9 +131,27 @@ const todoValidationChange: readonly ValidationChain[] = [
     .optional()
     .custom((val) => val === null || (typeof val === "number" && val > 0)),
   body("isDone").optional().isBoolean(),
-  header("content-type").matches("application/json; charset=utf-8"),
+  header("Content-Type").matches(
+    new RegExp("^application/json(; charset=utf-8)?$")
+  ),
 ];
 
+/**
+ * @openapi
+ * /todos:
+ *   summary: "allows interacting with the collection of all todos"
+ *   get:
+ *     summary: "Retrieve all todos"
+ *     responses:
+ *       200:
+ *         description: "All known todos"
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/todoupdate'
+ */
 app.get("/todos", async (req, res) => {
   res.json(TODOS);
 });
@@ -69,6 +164,33 @@ const generateUnusedID = async () => {
   return randomNum;
 };
 
+/**
+ * @openapi
+ * /todos:
+ *   post:
+ *     summary: "Submit a new todo"
+ *     parameters:
+ *      - name: Content-Type
+ *        in: header
+ *        required: true
+ *        schema:
+ *          type: string
+ *          enum: ["application/json", "application/json; charset=utf-8"]
+ *     requestBody:
+ *       content:
+ *         "application/json":
+ *           schema:
+ *             $ref: '#/components/schemas/todonew'
+ *         "application/json; charset=utf-8":
+ *           schema:
+ *             $ref: '#/components/schemas/todonew'
+ *     responses:
+ *       200:
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/todoupdate'
+ */
 app.post("/todos", ...todoValidationNew, async (req, res) => {
   const validationErrors = validationResult(req).array();
   if (validationErrors.length > 0) {
@@ -81,6 +203,29 @@ app.post("/todos", ...todoValidationNew, async (req, res) => {
   res.status(201).json(newTodo);
 });
 
+/**
+ * @openapi
+ * "/todos/{id}":
+ *   summary: "interact with a specific todo"
+ *   get:
+ *     summary: "Retrieve a specific todo"
+ *     parameters:
+ *      - name: "id"
+ *        in: "path"
+ *        required: true
+ *        schema:
+ *          type: "integer"
+ *          format: "int64"
+ *     responses:
+ *       200:
+ *         description: "The todo"
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/todoupdate'
+ *       404:
+ *         description: "Todo not found"
+ */
 app.get("/todos/:id", async (req, res) => {
   const id = parseInt(req.params.id);
   const todo = TODOS.find((todo) => todo._id === id);
@@ -91,6 +236,43 @@ app.get("/todos/:id", async (req, res) => {
   }
 });
 
+/**
+ * @openapi
+ * "/todos/{id}":
+ *   summary: "interact with a specific todo"
+ *   put:
+ *     summary: "Update a specific todo"
+ *     parameters:
+ *      - name: "id"
+ *        in: "path"
+ *        required: true
+ *        schema:
+ *          type: "integer"
+ *          format: "int64"
+ *      - name: Content-Type
+ *        in: header
+ *        required: true
+ *        schema:
+ *          type: string
+ *          enum: ["application/json", "application/json; charset=utf-8"]
+ *     requestBody:
+ *       content:
+ *         "application/json":
+ *           schema:
+ *             $ref: '#/components/schemas/todoupdate'
+ *         "application/json; charset=utf-8":
+ *           schema:
+ *             $ref: '#/components/schemas/todoupdate'
+ *     responses:
+ *       200:
+ *         description: "The todo"
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/todoupdate'
+ *       404:
+ *         description: "No known todo with that ID"
+ */
 app.put("/todos/:id", ...todoValidationChange, async (req, res) => {
   const validationErrors = validationResult(req).array();
   if (validationErrors.length > 0) {
@@ -114,6 +296,23 @@ app.put("/todos/:id", ...todoValidationChange, async (req, res) => {
   res.status(404).send();
 });
 
+/**
+ * @openapi
+ * "/todos/{id}":
+ *   summary: "interact with a specific todo"
+ *   delete:
+ *     summary: "Delete a specific todo"
+ *     parameters:
+ *      - name: "id"
+ *        in: "path"
+ *        required: true
+ *        schema:
+ *          type: "integer"
+ *          format: "int64"
+ *     responses:
+ *       204:
+ *         description: "No Content"
+ */
 app.delete("/todos/:id", param("id").isInt(), async (req, res) => {
   const validationErrors = validationResult(req).array();
   if (validationErrors.length > 0) {

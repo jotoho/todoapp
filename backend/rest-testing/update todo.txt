@@ -1,0 +1,10 @@
+PUT http://localhost:3000/todos/1671087245763
+Content-Type: application/json; charset=utf-8
+
+{
+  "_id": 1671087245763,
+  "title": "Für die Klausur Webentwicklung lernen",
+  "description": "",
+  "duetime": null,
+  "isDone": true
+}
