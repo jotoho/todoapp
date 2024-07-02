@@ -5,6 +5,9 @@ import swaggerUI from "swagger-ui-express";
 import swaggerJSDoc from "swagger-jsdoc";
 import type { Todo } from "./todoapp.ts";
 import DB from "./db.ts";
+import { bigIntReplacer, bigIntReviver } from "./bigint-json.ts";
+
+const database = new DB();
 
 type CONFIG_TYPE = Readonly<{
   PORT: number;
@@ -82,11 +85,11 @@ const CONFIG: CONFIG_TYPE = Object.freeze({
 });
 
 const app = express();
-app.use(express.json());
+app.use(express.json({
+  reviver: bigIntReviver
+}));
 const swaggerDocs = swaggerJSDoc(CONFIG.SWAGGER_OPTIONS);
 app.use("/api-docs", swaggerUI.serve, swaggerUI.setup(swaggerDocs));
-
-const TODOS: Todo[] = [];
 
 const todoValidationNew: readonly ValidationChain[] = [
   body("_id").not().exists(),
@@ -103,11 +106,7 @@ const todoValidationNew: readonly ValidationChain[] = [
 ];
 
 const todoValidationChange: readonly ValidationChain[] = [
-  body("_id")
-    .notEmpty()
-    .isInt()
-    .custom((val) => val > 0)
-    .custom((val) => TODOS.some((todo) => todo._id === val)),
+  // body("_id").notEmpty(),
   body("title").notEmpty().isString(),
   body("description").optional().isString(),
   body("duetime")
@@ -136,19 +135,13 @@ const todoValidationChange: readonly ValidationChain[] = [
  *                 $ref: '#/components/schemas/todoupdate'
  */
 app.get("/todos", async (req, res) => {
-  res.json(TODOS);
+  const data = await database.queryAll();
+  res.type("application/json");
+  res.send(JSON.stringify(data, bigIntReplacer));
 });
 
-const generateUnusedID = async () => {
-  let randomNum = Math.floor(Math.random() * Number.MAX_SAFE_INTEGER);
-  while (TODOS.some((todo) => todo._id === randomNum)) {
-    randomNum = Math.floor(Math.random() * Number.MAX_SAFE_INTEGER);
-  }
-  return randomNum;
-};
-
 type ProtoTodo = {
-  _id?: number | null;
+  _id?: BigInt | number | null;
   title?: string;
   description?: string;
   duetime?: number | null;
@@ -156,13 +149,21 @@ type ProtoTodo = {
 };
 
 const normalizeTodo = async (protoTodo: ProtoTodo): Promise<Todo> => {
-  return {
-    _id: protoTodo._id ?? (await generateUnusedID()),
+  const sanitizedTodo: ProtoTodo = {
     title: protoTodo.title ?? "TITLE MISSING - THIS IS A BUG",
     description: protoTodo.description ?? "",
     duetime: protoTodo.duetime === undefined ? null : protoTodo.duetime,
     isDone: protoTodo.isDone === undefined ? false : protoTodo.isDone,
   };
+  if (Object.hasOwn(protoTodo, "_id") && protoTodo._id) {
+    if (protoTodo._id instanceof BigInt) {
+      sanitizedTodo._id = protoTodo._id;
+    }
+    else if (typeof(protoTodo._id) === "number") {
+      sanitizedTodo._id = BigInt(protoTodo._id);
+    }
+  }
+  return sanitizedTodo as Todo;
 };
 
 /**
@@ -199,8 +200,15 @@ app.post("/todos", ...todoValidationNew, async (req, res) => {
     return;
   }
   const newTodo: Todo = await normalizeTodo(req.body);
-  TODOS.push(newTodo);
-  res.status(201).json(newTodo);
+  database.insert(newTodo).then(insertedObj => {
+    res
+      .status(201)
+      .type("application/json")
+      .send(JSON.stringify(insertedObj, bigIntReplacer));
+  }).catch(err => {
+    res.status(500).send();
+    console.error(err);
+  })
 });
 
 /**
@@ -227,10 +235,10 @@ app.post("/todos", ...todoValidationNew, async (req, res) => {
  *         description: "Todo not found"
  */
 app.get("/todos/:id", async (req, res) => {
-  const id = parseInt(req.params.id);
-  const todo = TODOS.find((todo) => todo._id === id);
+  const id = BigInt(req.params.id);
+  const todo = database.queryById(id);
   if (todo) {
-    res.json(todo);
+    res.type("application/json").send(JSON.stringify(todo, bigIntReplacer));
   } else {
     res.status(404).send();
   }
@@ -279,21 +287,25 @@ app.put("/todos/:id", ...todoValidationChange, async (req, res) => {
     res.status(400).json(validationErrors);
     return;
   }
-  const id = parseInt(req.params?.id);
+  const id = BigInt(req.params?.id);
   if (id !== req.body._id) {
     console.error("ID mismatch", id, req.body._id);
     res.status(400).send("ID mismatch between URI and JSON");
   }
-  for (let index = 0; index < TODOS.length; index++) {
-    if (TODOS[index]._id === id) {
-      const updatedTodo = await normalizeTodo(req.body);
-      TODOS[index] = updatedTodo;
-      res.status(200).send(updatedTodo);
-      return;
-    }
-  }
 
-  res.status(404).send();
+  database
+    .update(id, await normalizeTodo(req.body))
+    .then((newlyUpdatedTodo) => {
+      if (newlyUpdatedTodo !== null) {
+        res.status(200).type("application/json").send(JSON.stringify(newlyUpdatedTodo, bigIntReplacer));
+      } else {
+        res.status(404).send();
+      }
+    })
+    .catch((error) => {
+      res.status(500).send();
+      console.error(error);
+    });
 });
 
 /**
@@ -319,17 +331,16 @@ app.delete("/todos/:id", param("id").isInt(), async (req, res) => {
     res.status(400).json(validationErrors);
     return;
   }
-  const id = Number.parseInt(req.params?.id);
-  while (true) {
-    const idx = TODOS.findIndex((todo) => todo._id === id);
-    if (idx >= 0) {
-      TODOS.splice(idx, 1);
-    } else {
-      // Stop when no element with given ID remains
-      break;
-    }
-  }
-  res.status(204).send();
+  const id = BigInt(req.params?.id);
+  database
+    .delete(id)
+    .then(() => {
+      res.status(204).send();
+    })
+    .catch((err) => {
+      res.status(500).send();
+      console.error(err);
+    });
 });
 
 const loadDummyEntries = async () => {
@@ -357,9 +368,14 @@ const loadDummyEntries = async () => {
     },
   ];
   for (const dummyPromise of dummies.map(normalizeTodo)) {
-    TODOS.push(await dummyPromise);
+    const entryToInsert = await dummyPromise;
+    if (await database.count(entryToInsert._id).catch(() => {}) === 0) {
+      database.insert(entryToInsert).catch(() => {});
+    }
   }
 };
 
-loadDummyEntries();
-app.listen(CONFIG.PORT);
+database.waitUntilReady().then(() => {
+  loadDummyEntries();
+  app.listen(CONFIG.PORT);
+});

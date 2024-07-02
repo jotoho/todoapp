@@ -1,5 +1,5 @@
 export type Todo = {
-  _id: number;
+  _id: BigInt;
   title: string;
   description: string;
   /** time in ms since unix epoch. must be positive */
