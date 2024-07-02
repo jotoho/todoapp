@@ -3,11 +3,13 @@ import { param, body, header, validationResult } from "express-validator";
 import type { ValidationChain } from "express-validator";
 import swaggerUI from "swagger-ui-express";
 import swaggerJSDoc from "swagger-jsdoc";
+import type { Todo } from "./todoapp.ts";
+import DB from "./db.ts";
 
-type CONFIG_TYPE = {
+type CONFIG_TYPE = Readonly<{
   PORT: number;
   SWAGGER_OPTIONS: Readonly<swaggerJSDoc.Options>;
-};
+}>;
 
 const CONFIG: CONFIG_TYPE = Object.freeze({
   PORT: 3000,
@@ -84,26 +86,7 @@ app.use(express.json());
 const swaggerDocs = swaggerJSDoc(CONFIG.SWAGGER_OPTIONS);
 app.use("/api-docs", swaggerUI.serve, swaggerUI.setup(swaggerDocs));
 
-let TODOS = [
-  {
-    _id: 1671056616571,
-    title: "Übung 4 machen",
-    duetime: new Date("2022-11-12T00:00:00.000Z").getTime(),
-    isDone: false,
-  },
-  {
-    _id: 1671087245763,
-    title: "Für die Klausur Webentwicklung lernen",
-    duetime: new Date("2023-01-14T00:00:00.000Z").getTime(),
-    isDone: true,
-  },
-  {
-    _id: 1671087245764,
-    title: "Einen Kuchen backen",
-    duetime: new Date("2023-01-14T00:00:00.000Z").getTime(),
-    isDone: false,
-  },
-];
+const TODOS: Todo[] = [];
 
 const todoValidationNew: readonly ValidationChain[] = [
   body("_id").not().exists(),
@@ -164,6 +147,24 @@ const generateUnusedID = async () => {
   return randomNum;
 };
 
+type ProtoTodo = {
+  _id?: number | null;
+  title?: string;
+  description?: string;
+  duetime?: number | null;
+  isDone?: boolean;
+};
+
+const normalizeTodo = async (protoTodo: ProtoTodo): Promise<Todo> => {
+  return {
+    _id: protoTodo._id ?? (await generateUnusedID()),
+    title: protoTodo.title ?? "TITLE MISSING - THIS IS A BUG",
+    description: protoTodo.description ?? "",
+    duetime: protoTodo.duetime === undefined ? null : protoTodo.duetime,
+    isDone: protoTodo.isDone === undefined ? false : protoTodo.isDone,
+  };
+};
+
 /**
  * @openapi
  * /todos:
@@ -197,8 +198,7 @@ app.post("/todos", ...todoValidationNew, async (req, res) => {
     res.status(400).json(validationErrors);
     return;
   }
-  const newTodo = req.body;
-  newTodo._id = await generateUnusedID();
+  const newTodo: Todo = await normalizeTodo(req.body);
   TODOS.push(newTodo);
   res.status(201).json(newTodo);
 });
@@ -286,9 +286,9 @@ app.put("/todos/:id", ...todoValidationChange, async (req, res) => {
   }
   for (let index = 0; index < TODOS.length; index++) {
     if (TODOS[index]._id === id) {
-      TODOS[index] = req.body;
-      console.debug(req.body);
-      res.status(200).send(TODOS[index]);
+      const updatedTodo = await normalizeTodo(req.body);
+      TODOS[index] = updatedTodo;
+      res.status(200).send(updatedTodo);
       return;
     }
   }
@@ -320,8 +320,46 @@ app.delete("/todos/:id", param("id").isInt(), async (req, res) => {
     return;
   }
   const id = Number.parseInt(req.params?.id);
-  TODOS = TODOS.filter((todo) => todo._id !== id);
+  while (true) {
+    const idx = TODOS.findIndex((todo) => todo._id === id);
+    if (idx >= 0) {
+      TODOS.splice(idx, 1);
+    } else {
+      // Stop when no element with given ID remains
+      break;
+    }
+  }
   res.status(204).send();
 });
 
+const loadDummyEntries = async () => {
+  const dummies: ProtoTodo[] = [
+    {
+      _id: 1671056616571,
+      title: "Übung 4 machen",
+      description: "",
+      duetime: new Date("2022-11-12T00:00:00.000Z").getTime(),
+      isDone: false,
+    },
+    {
+      _id: 1671087245763,
+      title: "Für die Klausur Webentwicklung lernen",
+      description: "",
+      duetime: new Date("2023-01-14T00:00:00.000Z").getTime(),
+      isDone: true,
+    },
+    {
+      _id: 1671087245764,
+      title: "Einen Kuchen backen",
+      description: "",
+      duetime: new Date("2023-01-14T00:00:00.000Z").getTime(),
+      isDone: false,
+    },
+  ];
+  for (const dummyPromise of dummies.map(normalizeTodo)) {
+    TODOS.push(await dummyPromise);
+  }
+};
+
+loadDummyEntries();
 app.listen(CONFIG.PORT);

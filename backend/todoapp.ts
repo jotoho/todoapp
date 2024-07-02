@@ -1,7 +1,8 @@
 export type Todo = {
-    title: string,
-    _id: number,
-    description: string,
-    duetime: number | null,
-    isDone: boolean,
-}
+  _id: number;
+  title: string;
+  description: string;
+  /** time in ms since unix epoch. must be positive */
+  duetime: number | null;
+  isDone: boolean;
+};
