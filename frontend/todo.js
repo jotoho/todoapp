@@ -4,12 +4,36 @@
 */
 "use strict";
 
+/*
+    These two functions were copied from a Stack Overflow answer by Jon Musselwhite.
+    https://stackoverflow.com/a/77969073
+*/
+
+function bigIntReplacer(key, value) {
+  if (typeof value === "bigint") {
+    return value.toString() + "n";
+  }
+  return value;
+}
+
+function bigIntReviver(key, value) {
+  if (typeof value === "string" && /^\d+n$/.test(value)) {
+    return BigInt(value.slice(0, -1));
+  }
+  return value;
+}
+
+/* end of copied functions */
+
+/*
 const getRandomNumber = async () => {
   return Math.floor(Math.random() * Number.MAX_SAFE_INTEGER);
 };
+*/
 
 class Todo {
   static COLLECTION = new Map();
+  /*
   static async getUnusedTodoID() {
     for (
       let randomNumber = await getRandomNumber();
@@ -21,16 +45,17 @@ class Todo {
       }
     }
   }
+  */
 
   constructor(
     title,
-    id = null,
+    _id = null,
     description = "",
     duetime = null,
     isDone = false
   ) {
-    if (typeof id === "number" || id === null) {
-      this.id = id;
+    if (typeof _id === "bigint" || _id === null) {
+      this._id = _id;
     } else {
       throw "Illegal Todo ID";
     }
@@ -65,7 +90,7 @@ class Todo {
 
 const editTodo = async (todo) => {
   document.getElementById("reset-todoform").click();
-  document.getElementById("newtodo-id").value = todo.id;
+  document.getElementById("newtodo-id").value = todo._id;
   document.getElementById("newtodo-title").value = todo.title;
   document.getElementById("newtodo-description").value = todo.description;
   const dueDate = new Date(todo.duetime);
@@ -76,10 +101,17 @@ const editTodo = async (todo) => {
 };
 
 const removeTodo = async (todo, DOMElement) => {
-  Todo.COLLECTION.delete(todo.id);
+  Todo.COLLECTION.delete(todo._id);
+  fetch("http://localhost:3000/todos/" + todo._id.toString(10), {
+    method: "DELETE"
+  }).then(async response => {
+    if (response.status !== 204) {
+      console.error(response);
+    }
+  })
   DOMElement.remove();
   rebuildTODOList();
-  if (document.getElementById("newtodo-id").value == todo.id) {
+  if (document.getElementById("newtodo-id").value == todo._id) {
     document.getElementById("reset-todoform").click();
   }
 };
@@ -94,7 +126,7 @@ const rebuildTODOList = async () => {
   for (const todo of Todo.COLLECTION.values()) {
     const row = document.createElement("tr");
     row.innerHTML = `
-    <td class="todoid">${todo.id}</td>
+    <td class="todoid">0x${todo._id?.toString(16)}</td>
     <td class="todotitle">${todo.title}</td>
     <td class="tododue">${
       todo.duetime !== null
@@ -128,6 +160,7 @@ const rebuildTODOList = async () => {
   }
 };
 
+/*
 const generateTestTODOS = async () => {
   const titles = [
     "Nonsense",
@@ -148,22 +181,71 @@ const generateTestTODOS = async () => {
     );
   }
   await rebuildTODOList();
+};*/
+
+const sendNew = async (todo) => {
+  return fetch("http://localhost:3000/todos", {
+    method: "POST",
+    body: JSON.stringify(todo, bigIntReplacer),
+    headers: [
+      ["Content-Type", "application/json; charset=utf-8"],
+      //["Accept", "application/json"],
+    ],
+  }).then(async response => {
+    if (!response.ok) {
+      alert("Uploading todo 0x" + todo._id.toString(16) + " failed");
+      console.error(response);
+      return;
+    }
+    return JSON.parse(await response.text(), bigIntReviver);
+  }).catch(err => {
+    console.error(err);
+  });
+};
+
+const sendUpdate = async (todo) => {
+  return fetch("http://localhost:3000/todos/" + todo._id.toString(10), {
+    method: "PUT",
+    body: JSON.stringify(todo, bigIntReplacer),
+    headers: [["Content-Type", "application/json; charset=utf-8"]],
+  }).then(async response => {
+    if (!response.ok) {
+      console.error(response);
+      alert("Uploading todo 0x" + todo._id.toString(16) + " failed");
+      return;
+    }
+    return JSON.parse(await response.text(), bigIntReviver)
+  });
 };
 
 const submissionListener = async () => {
   const idElementValue = document.getElementById("newtodo-id").value;
   const id =
     typeof (idElementValue === "string") && idElementValue
-      ? Number.parseInt(idElementValue)
-      : await Todo.getUnusedTodoID();
+      ? BigInt(idElementValue)
+      : undefined;
   const title = document.getElementById("newtodo-title").value;
   const description = document.getElementById("newtodo-description").value;
   const duetime = document.getElementById("newtodo-duetime").value || null;
   const taskDone = document.getElementById("newtodo-isdone").checked ?? false;
 
-  Todo.COLLECTION.set(id, new Todo(title, id, description, duetime, taskDone));
-  rebuildTODOList();
-  document.getElementById("reset-todoform")?.click();
+  let newTodo = new Todo(title, id, description, duetime, taskDone);
+  if (newTodo.duetime === null || newTodo.duetime === undefined) {
+    delete newTodo.duetime;
+  }
+  let responsePromise = undefined;
+  if (id === undefined) {
+    delete newTodo._id;
+    responsePromise = sendNew(newTodo);
+  }
+  else {
+    responsePromise = sendUpdate(newTodo);
+  }
+  responsePromise.then(todo => {
+    Todo.COLLECTION.set(todo._id, todo);
+    rebuildTODOList();
+    document.getElementById("reset-todoform")?.click();
+  });
 };
 
 document.getElementById("newtodoform").addEventListener(
@@ -177,4 +259,21 @@ document.getElementById("newtodoform").addEventListener(
   }
 );
 
-generateTestTODOS();
+const loadTodos = async () => {
+  fetch("http://localhost:3000/todos", {
+    method: "GET",
+  }).then(async (response) => {
+    if (response.ok) {
+      const remoteData = JSON.parse(await response.text(), bigIntReviver);
+      for (const remoteTodo of remoteData) {
+        Todo.COLLECTION.set(remoteTodo._id, remoteTodo);
+      }
+      if (remoteData.length > 0) {
+        rebuildTODOList();
+      }
+    }
+  });
+};
+
+loadTodos();
+//generateTestTODOS();

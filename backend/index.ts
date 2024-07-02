@@ -6,6 +6,7 @@ import swaggerJSDoc from "swagger-jsdoc";
 import type { Todo } from "./todoapp.ts";
 import DB from "./db.ts";
 import { bigIntReplacer, bigIntReviver } from "./bigint-json.ts";
+import cors from 'cors';
 
 const database = new DB();
 
@@ -85,6 +86,7 @@ const CONFIG: CONFIG_TYPE = Object.freeze({
 });
 
 const app = express();
+app.use(cors())
 app.use(express.json({
   reviver: bigIntReviver
 }));

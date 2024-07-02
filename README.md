@@ -1,12 +1,9 @@
-# Beispiel: ToDo-Anwendung
+Getesteter Betrieb:
+ Öffnen des Frontends in Chromium-basiertem Browser direkt vom Dateisystem (kein Webserver),
+ Betrieb des Backends mittels `npm start`.
 
-Im Modul *Webentwicklung Frontend* haben wir das Frontend einer ToDo-Anwendung entwickelt. Diese Anwendung hat komplett im Browser funktioniert und ihre
-Daten im [LocalStorage](https://developer.mozilla.org/en-US/docs/Web/API/Window/localStorage) gespeichert.
-In den ersten Aufgaben des Moduls *Webentwicklung Backend* wollen wir ein Backend für die Anwendung schreiben, das die Daten serverseitig in einer
-Datenbank speichert und eine Benutzerverwaltung implementiert.
+Es war meinerseits eine Dockerfile mit Caddy webserver/proxy vorgesehen, das ist aber auf Gründen
+der Zeitnot weggefallen.
 
-- [ ] [Projekt initialisieren](backend/exercise0.md)
-- [ ] [REST-Schnittstelle erstellen](backend/exercise1.md)
-- [ ] [Frontend und Backend verbinden](backend/exercise2.md)
-- [ ] [ToDos in Datenbank persistieren](backend/exercise3.md)
-- [ ] [Benutzerverwaltung konfigurieren](backend/exercise4.md)
+Bekannter Fehler: Beim Versenden von Updates aus dem Frontend wird teilweise die GUI nicht richtig
+                  aktualisiert. In diesem Fall, laden Sie die Seite bitte neu.
